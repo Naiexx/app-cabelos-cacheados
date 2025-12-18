@@ -44,8 +44,11 @@ export default function LoginPage() {
       localStorage.setItem('authToken', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
 
-      // Redirecionar para página principal
-      router.push('/')
+      // Salvar também como cookie para o middleware detectar
+      document.cookie = `authToken=${data.token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
+
+      // Redirecionar para dashboard
+      router.push('/dashboard')
       router.refresh()
     } catch (err: any) {
       setError(err.message)

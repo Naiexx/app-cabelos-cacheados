@@ -46,6 +46,7 @@ function AnalysisContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null)
@@ -54,6 +55,7 @@ function AnalysisContent() {
   const [clientSecret, setClientSecret] = useState<string | null>(null)
   const [hasPaid, setHasPaid] = useState(false)
   const [isCheckingPayment, setIsCheckingPayment] = useState(false)
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null)
   
   // 🔥 Estados para identificação do usuário
   const [userName, setUserName] = useState('')
@@ -71,9 +73,6 @@ function AnalysisContent() {
     mainConcern: '',
     currentRoutine: ''
   })
-
-  // 🔥 REMOVIDO: Não carregar dados do localStorage no início
-  // Sempre pedir identificação a cada sessão
 
   // Verificar se voltou do checkout com sucesso
   useEffect(() => {
@@ -243,40 +242,27 @@ function AnalysisContent() {
     }
   }
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 🔥 FUNÇÃO CORRIGIDA: Verificar pagamento DEPOIS de selecionar imagem
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
-      // Validar tipo de arquivo
-      if (!file.type.startsWith('image/')) {
-        setError('Por favor, selecione um arquivo de imagem válido.')
-        return
-      }
+    if (!file) return
 
-      // Validar tamanho (máx 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('A imagem é muito grande. Por favor, use uma imagem menor que 5MB.')
-        return
-      }
-
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setSelectedImage(reader.result as string)
-        setError(null)
-      }
-      reader.onerror = () => {
-        setError('Erro ao carregar a imagem. Tente novamente.')
-      }
-      reader.readAsDataURL(file)
+    // Validar tipo de arquivo
+    if (!file.type.startsWith('image/')) {
+      setError('Por favor, selecione um arquivo de imagem válido.')
+      return
     }
-  }
 
-  const triggerFileInput = async () => {
+    // Validar tamanho (máx 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('A imagem é muito grande. Por favor, use uma imagem menor que 5MB.')
+      return
+    }
+
+    console.log('📸 Imagem selecionada, verificando pagamento...')
+
     try {
-      setError(null)
-      
-      console.log('🔍 Verificando status de pagamento para:', userEmail)
-      
-      // 🔥 SEMPRE VERIFICAR NO SUPABASE ANTES DE PERMITIR UPLOAD
+      // 🔥 VERIFICAR PAGAMENTO NO SUPABASE APÓS SELEÇÃO
       const { data: profile, error: supabaseError } = await supabase
         .from('user_profiles')
         .select('has_paid')
@@ -284,20 +270,31 @@ function AnalysisContent() {
         .single()
       
       if (!supabaseError && profile?.has_paid === true) {
-        console.log('✅ Usuário já pagou (Supabase) - permitindo upload')
+        // ✅ Usuário já pagou - processar imagem normalmente
+        console.log('✅ Pagamento confirmado - processando imagem')
         setHasPaid(true)
-        fileInputRef.current?.click()
+        
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          setSelectedImage(reader.result as string)
+          setError(null)
+        }
+        reader.onerror = () => {
+          setError('Erro ao carregar a imagem. Tente novamente.')
+        }
+        reader.readAsDataURL(file)
         return
       }
       
-      // Usuário precisa pagar - criar checkout
-      console.log('💳 Usuário precisa pagar - criando checkout')
+      // ❌ Usuário NÃO pagou - guardar arquivo e mostrar checkout
+      console.log('💳 Pagamento necessário - abrindo checkout')
+      setPendingImageFile(file)
       
       const response = await fetch('/api/create-checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || null,
+          priceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID || 'price_1SfUz8PIsn3cXV4Mrg89zmeY',
           customerEmail: userEmail,
           customerName: userName
         })
@@ -312,10 +309,28 @@ function AnalysisContent() {
       setClientSecret(data.clientSecret)
       setShowCheckout(true)
       
+      // Limpar input para permitir nova seleção
+      e.target.value = ''
+      
     } catch (err: any) {
       console.error('Erro ao processar:', err)
       setError(err.message || 'Erro ao processar. Tente novamente.')
+      e.target.value = ''
     }
+  }
+
+  // 🔥 FUNÇÃO SIMPLIFICADA: Apenas aciona input (SEM async)
+  const triggerCamera = () => {
+    console.log('📸 Abrindo câmera...')
+    setError(null)
+    cameraInputRef.current?.click()
+  }
+
+  // 🔥 FUNÇÃO SIMPLIFICADA: Apenas aciona input (SEM async)
+  const triggerGallery = () => {
+    console.log('🖼️ Abrindo galeria...')
+    setError(null)
+    fileInputRef.current?.click()
   }
 
   // 🔥 NOVA FUNÇÃO: Salvar análise no Supabase
@@ -640,33 +655,47 @@ function AnalysisContent() {
                     Para melhores resultados, tire uma foto com boa iluminação natural
                   </p>
                   
-                  {/* Botões de Upload - Mobile First */}
+                  {/* 🔥 BOTÕES CORRIGIDOS - ACIONAM INPUT DIRETAMENTE */}
                   <div className="flex flex-col sm:flex-row gap-3 justify-center">
                     <Button 
-                      onClick={triggerFileInput}
-                      className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-95 transition-transform w-full sm:w-auto"
+                      onClick={triggerCamera}
+                      type="button"
+                      className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 active:scale-95 transition-transform w-full sm:w-auto text-base py-6"
                     >
-                      <Camera className="w-4 h-4 mr-2" />
+                      <Camera className="w-5 h-5 mr-2" />
                       {hasPaid ? 'Tirar Foto' : 'Tirar Foto - R$ 24,99'}
                     </Button>
                     
                     <Button 
-                      onClick={triggerFileInput}
+                      onClick={triggerGallery}
+                      type="button"
                       variant="outline"
-                      className="border-emerald-500 text-emerald-700 hover:bg-emerald-50 active:scale-95 transition-transform w-full sm:w-auto"
+                      className="border-emerald-500 text-emerald-700 hover:bg-emerald-50 active:scale-95 transition-transform w-full sm:w-auto text-base py-6"
                     >
-                      <Upload className="w-4 h-4 mr-2" />
+                      <Upload className="w-5 h-5 mr-2" />
                       Escolher da Galeria
                     </Button>
                   </div>
 
+                  {/* 🔥 INPUT PARA CÂMERA - OTIMIZADO MOBILE */}
                   <input
-                    ref={fileInputRef}
+                    ref={cameraInputRef}
                     type="file"
                     accept="image/*"
                     capture="environment"
                     onChange={handleImageUpload}
                     className="hidden"
+                    aria-label="Tirar foto com câmera"
+                  />
+
+                  {/* 🔥 INPUT PARA GALERIA - OTIMIZADO MOBILE */}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    aria-label="Escolher foto da galeria"
                   />
                 </div>
 

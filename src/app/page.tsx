@@ -18,13 +18,13 @@ export default function Home() {
 
   useEffect(() => {
     // Verificar se usuário está logado
-    if (typeof window !== 'undefined') {
-      const authToken = localStorage.getItem('authToken')
-      const userData = localStorage.getItem('user')
-      
-      if (authToken && userData) {
-        setUser(JSON.parse(userData))
-      }
+    const authToken = localStorage.getItem('authToken')
+    const userData = localStorage.getItem('user')
+    
+    if (authToken && userData) {
+      setUser(JSON.parse(userData))
+      // Garantir que o cookie também esteja definido
+      document.cookie = `authToken=${authToken}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`
     }
 
     // Carregar produtos da loja
@@ -44,10 +44,10 @@ export default function Home() {
   }
 
   const handleLogout = () => {
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('authToken')
-      localStorage.removeItem('user')
-    }
+    localStorage.removeItem('authToken')
+    localStorage.removeItem('user')
+    // Remover também o cookie
+    document.cookie = 'authToken=; path=/; max-age=0'
     setUser(null)
     router.refresh()
   }

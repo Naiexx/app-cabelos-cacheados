@@ -60,14 +60,27 @@ export async function middleware(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith('/dashboard')) {
     console.log('🔒 Middleware: Verificando acesso ao dashboard...')
     
-    // Se não estiver autenticado, redirecionar para home
-    if (!user || authError) {
+    // ✅ CORREÇÃO: Verificar também se há authToken nos cookies (sistema local de autenticação)
+    const authTokenCookie = request.cookies.get('authToken')?.value
+    const hasLocalAuth = !!authTokenCookie
+    
+    console.log('🔍 Middleware: authToken cookie presente?', hasLocalAuth)
+    console.log('🔍 Middleware: Supabase user presente?', !!user)
+    
+    // Se não estiver autenticado por NENHUM método, redirecionar para home
+    if (!user && !hasLocalAuth) {
       console.log('❌ Middleware: Usuário não autenticado - redirecionando para home')
-      console.log('Erro de autenticação:', authError)
       return NextResponse.redirect(new URL('/', request.url))
     }
 
-    console.log('✅ Middleware: Usuário autenticado:', user.id)
+    // ✅ Se tem autenticação local (authToken), permitir acesso direto ao dashboard
+    if (hasLocalAuth && !user) {
+      console.log('✅ Middleware: Autenticação local detectada - permitindo acesso ao dashboard')
+      return response
+    }
+
+    // Se chegou aqui, tem usuário Supabase - verificar pagamento
+    console.log('✅ Middleware: Usuário Supabase autenticado:', user?.id)
     console.log('🔍 Middleware: Verificando status de pagamento na tabela users...')
 
     try {
@@ -75,7 +88,7 @@ export async function middleware(request: NextRequest) {
       const { data: userData, error: dbError } = await supabase
         .from('users')
         .select('has_paid')
-        .eq('id', user.id)
+        .eq('id', user!.id)
         .single()
 
       if (dbError) {

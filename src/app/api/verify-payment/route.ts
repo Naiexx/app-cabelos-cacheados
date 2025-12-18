@@ -45,7 +45,9 @@ export async function POST(req: NextRequest) {
       const customerEmail = session.customer_details?.email
 
       if (customerEmail) {
-        // Buscar usuário pelo email
+        // 🔥 CORREÇÃO: Atualizar AMBAS as tabelas (user_profiles E users)
+        
+        // 1. Buscar usuário pelo email em user_profiles
         const { data: userData, error: fetchError } = await supabase
           .from('user_profiles')
           .select('id')
@@ -53,18 +55,39 @@ export async function POST(req: NextRequest) {
           .single()
 
         if (fetchError) {
-          console.error('Erro ao buscar usuário:', fetchError)
+          console.error('Erro ao buscar usuário em user_profiles:', fetchError)
         } else if (userData) {
-          // Atualizar has_paid para true
-          const { error: updateError } = await supabase
+          // 2. Atualizar has_paid em user_profiles
+          const { error: updateProfileError } = await supabase
             .from('user_profiles')
             .update({ has_paid: true })
             .eq('id', userData.id)
 
-          if (updateError) {
-            console.error('Erro ao atualizar has_paid:', updateError)
+          if (updateProfileError) {
+            console.error('Erro ao atualizar has_paid em user_profiles:', updateProfileError)
           } else {
-            console.log('✅ has_paid atualizado para true no Supabase')
+            console.log('✅ has_paid atualizado para true em user_profiles')
+          }
+
+          // 3. Atualizar has_paid na tabela users (usada pelo middleware)
+          const { error: updateUsersError } = await supabase
+            .from('users')
+            .update({ has_paid: true })
+            .eq('id', userData.id)
+
+          if (updateUsersError) {
+            console.error('Erro ao atualizar has_paid em users:', updateUsersError)
+            // Tentar por email se falhar por ID
+            const { error: emailUpdateError } = await supabase
+              .from('users')
+              .update({ has_paid: true })
+              .eq('email', customerEmail)
+
+            if (!emailUpdateError) {
+              console.log('✅ has_paid atualizado para true em users (por email)')
+            }
+          } else {
+            console.log('✅ has_paid atualizado para true em users')
           }
         }
       }

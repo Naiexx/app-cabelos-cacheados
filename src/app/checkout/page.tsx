@@ -12,14 +12,25 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Loader2, CheckCircle, XCircle } from 'lucide-react'
 import Link from 'next/link'
-import Image from 'next/image'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+
+// 🔥 VALIDAÇÃO CRÍTICA: Verificar se a chave do Stripe está configurada
+if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+  console.error('❌ ERRO CRÍTICO: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY não está configurada!')
+  console.error('💡 SOLUÇÃO: Configure as variáveis de ambiente na Vercel')
+  console.error('📋 Veja: CONFIGURACAO_PRODUCAO.md')
+}
 
 // Carregar Stripe com a chave pública
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
+const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
+  ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+  : null
 
-function CheckoutForm() {
+function CheckoutForm({ paymentIntentId }: { paymentIntentId: string }) {
   const stripe = useStripe()
   const elements = useElements()
+  const router = useRouter()
   const [isProcessing, setIsProcessing] = useState(false)
   const [paymentStatus, setPaymentStatus] = useState<'idle' | 'success' | 'error'>('idle')
   const [errorMessage, setErrorMessage] = useState('')
@@ -47,7 +58,13 @@ function CheckoutForm() {
         setErrorMessage(error.message || 'Erro ao processar pagamento')
         setPaymentStatus('error')
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+        console.log('✅ Pagamento confirmado! Payment Intent ID:', paymentIntent.id)
         setPaymentStatus('success')
+        
+        // Redirecionar para página de sucesso após 1 segundo
+        setTimeout(() => {
+          router.push('/checkout/success')
+        }, 1000)
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Erro inesperado')
@@ -63,13 +80,9 @@ function CheckoutForm() {
         <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
         <h2 className="text-2xl font-bold mb-2 text-gray-800">Pagamento Confirmado!</h2>
         <p className="text-gray-600 mb-6">
-          Seu pagamento foi processado com sucesso. Você já pode usar a análise com IA!
+          Seu pagamento foi processado com sucesso. Redirecionando...
         </p>
-        <Link href="/dashboard">
-          <Button className="w-full bg-gradient-to-r from-rose-300 to-purple-300 hover:from-rose-400 hover:to-purple-400 text-white">
-            Ir para Dashboard
-          </Button>
-        </Link>
+        <Loader2 className="w-8 h-8 text-purple-600 mx-auto animate-spin" />
       </Card>
     )
   }
@@ -141,26 +154,59 @@ function CheckoutForm() {
 
 export default function CheckoutPage() {
   const [clientSecret, setClientSecret] = useState('')
+  const [paymentIntentId, setPaymentIntentId] = useState('')
   const [loading, setLoading] = useState(true)
+  const [userId, setUserId] = useState<string | null>(null)
 
   useEffect(() => {
-    // Criar Payment Intent ao carregar a página
-    fetch('/api/stripe/create-payment-intent', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ amount: 2499 }), // R$ 24,99
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        setClientSecret(data.clientSecret)
+    // 🔥 CRÍTICO: Obter userId do usuário autenticado
+    const getUserAndCreatePayment = async () => {
+      try {
+        // Obter usuário autenticado
+        const { data: { user }, error: authError } = await supabase.auth.getUser()
+        
+        if (authError || !user) {
+          console.error('❌ Usuário não autenticado:', authError)
+          setLoading(false)
+          return
+        }
+
+        console.log('✅ Usuário autenticado:', user.id)
+        setUserId(user.id)
+
+        // Criar Payment Intent com userId
+        const response = await fetch('/api/stripe/create-payment-intent', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            amount: 2499, // R$ 24,99
+            userId: user.id, // 🔥 ENVIAR userId
+          }),
+        })
+
+        const data = await response.json()
+        
+        if (data.clientSecret) {
+          setClientSecret(data.clientSecret)
+          setPaymentIntentId(data.paymentIntentId)
+          console.log('✅ Payment Intent criado:', {
+            paymentIntentId: data.paymentIntentId,
+            userId: data.userId,
+            warning: data.warning,
+          })
+        } else {
+          console.error('❌ Erro ao criar Payment Intent:', data)
+        }
+      } catch (error) {
+        console.error('❌ Erro ao criar Payment Intent:', error)
+      } finally {
         setLoading(false)
-      })
-      .catch((error) => {
-        console.error('Erro ao criar Payment Intent:', error)
-        setLoading(false)
-      })
+      }
+    }
+
+    getUserAndCreatePayment()
   }, [])
 
   if (loading) {
@@ -178,6 +224,161 @@ export default function CheckoutPage() {
     )
   }
 
+  // 🔥 VALIDAÇÃO: Verificar se Stripe está configurado
+  if (!stripePromise) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-purple-50 flex items-center justify-center">
+        <Card className="p-8 text-center max-w-md mx-auto">
+          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2 text-gray-800">Stripe Não Configurado</h2>
+          <p className="text-gray-600 mb-4">
+            As variáveis de ambiente do Stripe não estão configuradas no ambiente de produção.
+          </p>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-left">
+            <p className="text-sm text-gray-700 font-semibold mb-2">
+              🔧 Para o administrador:
+            </p>
+            <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
+              <li>Acesse a Vercel</li>
+              <li>Vá em Settings → Environment Variables</li>
+              <li>Adicione: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</li>
+              <li>Faça Redeploy do site</li>
+            </ol>
+          </div>
+          <Link href="/">
+            <Button className="w-full bg-gradient-to-r from-rose-300 to-purple-300 hover:from-rose-400 hover:to-purple-400 text-white">
+              Voltar para Home
+            </Button>
+          </Link>
+        </Card>
+      </div>
+    )
+  }
+
+  // 🔥 VALIDAÇÃO: Verificar se Stripe está configurado
+  if (!stripePromise) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-purple-50 flex items-center justify-center">
+        <Card className="p-8 text-center max-w-md mx-auto">
+          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2 text-gray-800">Stripe Não Configurado</h2>
+          <p className="text-gray-600 mb-4">
+            As variáveis de ambiente do Stripe não estão configuradas no ambiente de produção.
+          </p>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-left">
+            <p className="text-sm text-gray-700 font-semibold mb-2">
+              🔧 Para o administrador:
+            </p>
+            <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
+              <li>Acesse a Vercel</li>
+              <li>Vá em Settings → Environment Variables</li>
+              <li>Adicione: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</li>
+              <li>Faça Redeploy do site</li>
+            </ol>
+          </div>
+          <Link href="/">
+            <Button className="w-full bg-gradient-to-r from-rose-300 to-purple-300 hover:from-rose-400 hover:to-purple-400 text-white">
+              Voltar para Home
+            </Button>
+          </Link>
+        </Card>
+      </div>
+    )
+  }
+
+  // 🔥 VALIDAÇÃO: Verificar se Stripe está configurado
+  if (!stripePromise) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-purple-50 flex items-center justify-center">
+        <Card className="p-8 text-center max-w-md mx-auto">
+          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2 text-gray-800">Stripe Não Configurado</h2>
+          <p className="text-gray-600 mb-4">
+            As variáveis de ambiente do Stripe não estão configuradas no ambiente de produção.
+          </p>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-left">
+            <p className="text-sm text-gray-700 font-semibold mb-2">
+              🔧 Para o administrador:
+            </p>
+            <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
+              <li>Acesse a Vercel</li>
+              <li>Vá em Settings → Environment Variables</li>
+              <li>Adicione: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</li>
+              <li>Faça Redeploy do site</li>
+            </ol>
+          </div>
+          <Link href="/">
+            <Button className="w-full bg-gradient-to-r from-rose-300 to-purple-300 hover:from-rose-400 hover:to-purple-400 text-white">
+              Voltar para Home
+            </Button>
+          </Link>
+        </Card>
+      </div>
+    )
+  }
+
+  // 🔥 VALIDAÇÃO: Verificar se Stripe está configurado
+  if (!stripePromise) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-purple-50 flex items-center justify-center">
+        <Card className="p-8 text-center max-w-md mx-auto">
+          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2 text-gray-800">Stripe Não Configurado</h2>
+          <p className="text-gray-600 mb-4">
+            As variáveis de ambiente do Stripe não estão configuradas no ambiente de produção.
+          </p>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-left">
+            <p className="text-sm text-gray-700 font-semibold mb-2">
+              🔧 Para o administrador:
+            </p>
+            <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
+              <li>Acesse a Vercel</li>
+              <li>Vá em Settings → Environment Variables</li>
+              <li>Adicione: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</li>
+              <li>Faça Redeploy do site</li>
+            </ol>
+          </div>
+          <Link href="/">
+            <Button className="w-full bg-gradient-to-r from-rose-300 to-purple-300 hover:from-rose-400 hover:to-purple-400 text-white">
+              Voltar para Home
+            </Button>
+          </Link>
+        </Card>
+      </div>
+    )
+  }
+
+  // 🔥 VALIDAÇÃO: Verificar se Stripe está configurado
+  if (!stripePromise) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-purple-50 flex items-center justify-center">
+        <Card className="p-8 text-center max-w-md mx-auto">
+          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold mb-2 text-gray-800">Stripe Não Configurado</h2>
+          <p className="text-gray-600 mb-4">
+            As variáveis de ambiente do Stripe não estão configuradas no ambiente de produção.
+          </p>
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 text-left">
+            <p className="text-sm text-gray-700 font-semibold mb-2">
+              🔧 Para o administrador:
+            </p>
+            <ol className="text-xs text-gray-600 space-y-1 list-decimal list-inside">
+              <li>Acesse a Vercel</li>
+              <li>Vá em Settings → Environment Variables</li>
+              <li>Adicione: NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY</li>
+              <li>Faça Redeploy do site</li>
+            </ol>
+          </div>
+          <Link href="/">
+            <Button className="w-full bg-gradient-to-r from-rose-300 to-purple-300 hover:from-rose-400 hover:to-purple-400 text-white">
+              Voltar para Home
+            </Button>
+          </Link>
+        </Card>
+      </div>
+    )
+  }
+
   if (!clientSecret) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-purple-50 flex items-center justify-center">
@@ -185,11 +386,14 @@ export default function CheckoutPage() {
           <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-2 text-gray-800">Erro ao Carregar</h2>
           <p className="text-gray-600 mb-6">
-            Não foi possível inicializar o checkout. Tente novamente.
+            {!userId 
+              ? 'Você precisa estar autenticado para fazer o checkout.'
+              : 'Não foi possível inicializar o checkout. Tente novamente.'
+            }
           </p>
-          <Link href="/">
+          <Link href={!userId ? '/login' : '/'}>
             <Button className="w-full bg-gradient-to-r from-rose-300 to-purple-300 hover:from-rose-400 hover:to-purple-400 text-white">
-              Voltar para Home
+              {!userId ? 'Fazer Login' : 'Voltar para Home'}
             </Button>
           </Link>
         </Card>
@@ -226,7 +430,7 @@ export default function CheckoutPage() {
             },
           }}
         >
-          <CheckoutForm />
+          <CheckoutForm paymentIntentId={paymentIntentId} />
         </Elements>
       </div>
     </div>

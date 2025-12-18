@@ -1,15 +1,17 @@
 'use client'
 
+import { Suspense } from 'react'
 import { useEffect, useState } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { CheckCircle, Sparkles, Loader2 } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-export default function CheckoutSuccessPage() {
+function CheckoutSuccessContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [updating, setUpdating] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -33,9 +35,43 @@ export default function CheckoutSuccessPage() {
       }
 
       console.log('✅ Usuário autenticado:', user.id)
+
+      // 🔥 NOVO: Verificar se temos session_id do Stripe na URL
+      const sessionId = searchParams.get('session_id')
+      
+      if (sessionId) {
+        console.log('💳 Session ID do Stripe detectado:', sessionId)
+        console.log('🔄 Chamando endpoint de confirmação do Stripe...')
+        
+        try {
+          // Chamar o endpoint de confirmação do Stripe
+          const confirmResponse = await fetch('/api/stripe-webhook/confirm', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ session_id: sessionId }),
+          })
+
+          const confirmData = await confirmResponse.json()
+
+          if (confirmResponse.ok) {
+            console.log('✅ Pagamento confirmado via Stripe:', confirmData)
+          } else {
+            console.error('⚠️ Erro ao confirmar via Stripe:', confirmData)
+            // Continuar com atualização manual como fallback
+          }
+        } catch (stripeError) {
+          console.error('⚠️ Erro ao chamar endpoint Stripe:', stripeError)
+          // Continuar com atualização manual como fallback
+        }
+      } else {
+        console.log('ℹ️ Session ID não encontrado na URL - usando atualização manual')
+      }
+
       console.log('📝 Atualizando campo has_paid para true...')
 
-      // Atualizar campo has_paid para true
+      // Atualizar campo has_paid para true (fallback ou confirmação adicional)
       const { data: updateData, error: updateError } = await supabase
         .from('users')
         .update({ has_paid: true })
@@ -173,5 +209,22 @@ export default function CheckoutSuccessPage() {
         </p>
       </Card>
     </div>
+  )
+}
+
+export default function CheckoutSuccessPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-rose-50 via-pink-50 to-purple-50 flex items-center justify-center px-4">
+        <Card className="p-8 sm:p-12 text-center max-w-lg mx-auto">
+          <Loader2 className="w-16 h-16 text-purple-600 mx-auto mb-4 animate-spin" />
+          <h1 className="text-2xl font-bold mb-2 text-gray-800">
+            Carregando...
+          </h1>
+        </Card>
+      </div>
+    }>
+      <CheckoutSuccessContent />
+    </Suspense>
   )
 }
