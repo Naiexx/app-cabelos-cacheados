@@ -82,7 +82,7 @@ export default function Home() {
           <Link href="/" className="flex items-center gap-3">
             <div className="relative w-10 h-10">
               <Image
-                src="https://k6hrqrxuu8obbfwn.public.blob.vercel-storage.com/temp/7a2d6fd4-e054-471f-9b83-6b1bf3171c1f.png"
+                src="https://k6hrqrxuu8obbfwn.public.blob.vercel-storage.com/temp/ea2bd414-d463-40cc-b265-220181b28146.png"
                 alt="Curlara Logo"
                 fill
                 className="object-contain"

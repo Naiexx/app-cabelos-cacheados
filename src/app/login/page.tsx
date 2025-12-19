@@ -64,7 +64,7 @@ export default function LoginPage() {
         <div className="flex flex-col items-center mb-6">
           <div className="relative w-20 h-20 mb-4">
             <Image
-              src="https://k6hrqrxuu8obbfwn.public.blob.vercel-storage.com/temp/01b97d85-3f0a-4e1f-94fb-4be438d3886b.png"
+              src="https://k6hrqrxuu8obbfwn.public.blob.vercel-storage.com/temp/479db0ab-83eb-4377-bf9f-0334333ff18b.png"
               alt="Curlara Logo"
               fill
               className="object-contain"
