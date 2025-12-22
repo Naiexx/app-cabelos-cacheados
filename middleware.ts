@@ -1,4 +1,4 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
@@ -8,53 +8,29 @@ export async function middleware(request: NextRequest) {
     },
   })
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.remove({
-            name,
-            ...options,
-          })
-        },
-      },
-    }
-  )
+  // Criar cliente Supabase usando @supabase/supabase-js
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  
+  const supabase = createClient(supabaseUrl, supabaseAnonKey)
 
-  // Refresh session if expired - required for Server Components
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
+  // Obter token de autenticação dos cookies
+  const authToken = request.cookies.get('sb-access-token')?.value || 
+                    request.cookies.get('sb-refresh-token')?.value
+
+  let user = null
+  
+  // Se houver token, tentar obter usuário
+  if (authToken) {
+    try {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+      if (!authError && authUser) {
+        user = authUser
+      }
+    } catch (err) {
+      console.error('Erro ao obter usuário:', err)
+    }
+  }
 
   // 🔥 PROTEÇÃO DO DASHBOARD - VERIFICAR PAGAMENTO
   if (request.nextUrl.pathname.startsWith('/dashboard')) {

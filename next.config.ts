@@ -65,6 +65,66 @@ const nextConfig: NextConfig = {
         hostname: 'images-na.ssl-images-amazon.com',
       },
       
+      // AliExpress Media (imagens de produtos)
+      {
+        protocol: 'https',
+        hostname: 'ae-pic-a1.aliexpress-media.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.aliexpress-media.com',
+      },
+      
+      // AliExpress Media (imagens de produtos)
+      {
+        protocol: 'https',
+        hostname: 'ae-pic-a1.aliexpress-media.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.aliexpress-media.com',
+      },
+      
+      // AliExpress Media (imagens de produtos)
+      {
+        protocol: 'https',
+        hostname: 'ae-pic-a1.aliexpress-media.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.aliexpress-media.com',
+      },
+      
+      // AliExpress Media (imagens de produtos)
+      {
+        protocol: 'https',
+        hostname: 'ae-pic-a1.aliexpress-media.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.aliexpress-media.com',
+      },
+      
+      // AliExpress Media (imagens de produtos)
+      {
+        protocol: 'https',
+        hostname: 'ae-pic-a1.aliexpress-media.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.aliexpress-media.com',
+      },
+      
+      // AliExpress Media (imagens de produtos)
+      {
+        protocol: 'https',
+        hostname: 'ae-pic-a1.aliexpress-media.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '*.aliexpress-media.com',
+      },
+      
       // Vercel Blob
       {
         protocol: 'https',
