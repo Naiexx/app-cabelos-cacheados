@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Sparkles, Camera, Calendar, Award, ShoppingBag, Heart, User, LogOut, ExternalLink, ChevronDown, ChevronUp, Settings, Search } from 'lucide-react'
+import { Sparkles, Camera, Calendar, Award, ShoppingBag, Heart, User, LogOut, ExternalLink, ChevronDown, ChevronUp, Settings, Search, Quote } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -329,6 +329,60 @@ export default function Home() {
               Aprenda técnicas de finalização, hidratação e tratamentos com vídeos 
               educativos criados por especialistas em cabelos cacheados.
             </p>
+          </Card>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section className="container mx-auto px-4 py-12 sm:py-16">
+        <h3 className="text-2xl sm:text-3xl font-bold text-center mb-8 sm:mb-12 text-gray-800 px-4">
+          O Que Nossos Usuários Dizem
+        </h3>
+        <div className="grid sm:grid-cols-2 gap-6 sm:gap-8 max-w-5xl mx-auto">
+          {/* Depoimento 1 */}
+          <Card className="p-6 sm:p-8 bg-white hover:shadow-xl transition-all duration-300 border-2 border-rose-100">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-rose-300 to-pink-400 rounded-full flex items-center justify-center flex-shrink-0">
+                <Quote className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h4 className="font-bold text-lg text-gray-800">Mariana Silva</h4>
+                <p className="text-sm text-gray-500">Cachos tipo 3B</p>
+              </div>
+            </div>
+            <p className="text-gray-700 leading-relaxed italic">
+              "Depois de usar o Curlara, meus cachos nunca estiveram tão definidos e saudáveis! 
+              A análise com IA me ajudou a entender finalmente o que meu cabelo realmente precisava. 
+              Em apenas 2 meses, a diferença é incrível!"
+            </p>
+            <div className="flex gap-1 mt-4">
+              {[...Array(5)].map((_, i) => (
+                <Heart key={i} className="w-4 h-4 text-rose-400 fill-rose-400" />
+              ))}
+            </div>
+          </Card>
+
+          {/* Depoimento 2 */}
+          <Card className="p-6 sm:p-8 bg-white hover:shadow-xl transition-all duration-300 border-2 border-purple-100">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-purple-300 to-pink-400 rounded-full flex items-center justify-center flex-shrink-0">
+                <Quote className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h4 className="font-bold text-lg text-gray-800">Juliana Costa</h4>
+                <p className="text-sm text-gray-500">Cachos tipo 4A</p>
+              </div>
+            </div>
+            <p className="text-gray-700 leading-relaxed italic">
+              "A rotina personalizada mudou completamente minha relação com meu cabelo! 
+              Antes eu não sabia por onde começar, mas agora tenho um cronograma claro e produtos 
+              que realmente funcionam. Meu cabelo está mais hidratado e volumoso do que nunca!"
+            </p>
+            <div className="flex gap-1 mt-4">
+              {[...Array(5)].map((_, i) => (
+                <Heart key={i} className="w-4 h-4 text-purple-400 fill-purple-400" />
+              ))}
+            </div>
           </Card>
         </div>
       </section>
